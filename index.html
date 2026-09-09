@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<!-- Added to the home screen, iOS launches without any browser chrome. That
+     is the only way to lose the URL bar on an iPhone — Safari there has no
+     Fullscreen API. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Oderlads">
+<meta name="theme-color" content="#0f1115">
 <title>Oderlads — Melee Experiment</title>
 <style>
   :root {
@@ -93,16 +101,44 @@
   }
   #touch [data-k].on { background:rgba(110,231,168,.30); border-color:var(--accent); }
 
-  .tpad { position:absolute; left:16px; bottom:16px; width:156px; height:156px; }
+  /* Keep controls clear of the notch and home indicator. */
+  .tpad {
+    position:absolute; width:156px; height:156px;
+    left:calc(16px + env(safe-area-inset-left));
+    bottom:calc(16px + env(safe-area-inset-bottom));
+  }
   .tpad [data-k] { width:52px; height:52px; border-radius:10px; }
   .tpad [data-k="up"]    { left:52px; top:0; }
   .tpad [data-k="left"]  { left:0;    top:52px; }
   .tpad [data-k="right"] { left:104px;top:52px; }
   .tpad [data-k="down"]  { left:52px; top:104px; }
 
-  #touch [data-k="attack"] { right:16px;  bottom:20px;  width:78px; height:78px; }
-  #touch [data-k="jump"]   { right:104px; bottom:20px;  width:78px; height:78px; }
-  #touch [data-k="dash"]   { right:24px;  bottom:108px; width:62px; height:62px; }
+  #touch [data-k="attack"] { width:78px; height:78px;
+    right:calc(16px  + env(safe-area-inset-right));
+    bottom:calc(20px + env(safe-area-inset-bottom)); }
+  #touch [data-k="jump"]   { width:78px; height:78px;
+    right:calc(104px + env(safe-area-inset-right));
+    bottom:calc(20px + env(safe-area-inset-bottom)); }
+  #touch [data-k="dash"]   { width:62px; height:62px;
+    right:calc(24px  + env(safe-area-inset-right));
+    bottom:calc(108px + env(safe-area-inset-bottom)); }
+
+  #btnFull {
+    position:absolute; z-index:12;
+    top:calc(12px + env(safe-area-inset-top));
+    left:calc(12px + env(safe-area-inset-left));
+    width:38px; height:38px; padding:0; font-size:15px; line-height:1;
+    background:rgba(15,17,21,.72); border:1px solid var(--line);
+    border-radius:8px; color:var(--text);
+  }
+  #fullHint {
+    position:absolute; z-index:12;
+    top:calc(58px + env(safe-area-inset-top));
+    left:calc(12px + env(safe-area-inset-left));
+    max-width:210px; padding:8px 10px; font-size:11.5px; line-height:1.45;
+    background:rgba(15,17,21,.92); border:1px solid var(--line);
+    border-radius:6px; color:var(--dim);
+  }
 
   #rotate {
     position:fixed; inset:0; z-index:20; background:var(--bg);
@@ -134,6 +170,9 @@
       <button id="btnSolo">Practise alone</button>
       <div class="hint" id="netHint"></div>
     </div>
+
+    <button id="btnFull" class="hide" title="Fullscreen">&#9974;</button>
+    <div id="fullHint" class="hide"></div>
 
     <div id="touch" class="hide">
       <div class="tpad">
@@ -353,13 +392,50 @@ if (TOUCH) {
   addEventListener('orientationchange', checkOrientation);
 }
 
-// Best effort — iPhone Safari has no Fullscreen API, so this simply does
-// nothing there rather than failing loudly.
+// --- fullscreen ------------------------------------------------------------
+
+const docEl = document.documentElement;
+const canFullscreen = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+
+// Already launched from the home screen: there is no chrome to hide.
+const STANDALONE = navigator.standalone === true ||
+                   matchMedia('(display-mode: standalone)').matches;
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
 function goFullscreen() {
-  if (!TOUCH || document.fullscreenElement) return;
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (req) req.call(el).catch(() => {});
+  if (!TOUCH || !canFullscreen || isFullscreen()) return;
+  const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  req.call(docEl).catch(() => {});
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit) exit.call(document).catch(() => {});
+}
+
+if (TOUCH && !STANDALONE) $('btnFull').classList.remove('hide');
+
+$('btnFull').onclick = () => {
+  if (!canFullscreen) {
+    // iPhone Safari. The only way to lose the URL bar is the home screen, so
+    // say that plainly instead of leaving a button that does nothing.
+    const hint = $('fullHint');
+    hint.textContent = 'iPhone Safari cannot go fullscreen. Tap Share, then ' +
+                       '"Add to Home Screen" — opening it from there hides ' +
+                       'the address bar.';
+    hint.classList.toggle('hide');
+    return;
+  }
+  isFullscreen() ? exitFullscreen() : goFullscreen();
+};
+
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(ev, () => {
+    $('btnFull').innerHTML = isFullscreen() ? '&#10005;' : '&#9974;';
+  });
 }
 
 // --- loop ------------------------------------------------------------------

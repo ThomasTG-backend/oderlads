@@ -101,13 +101,21 @@
   }
   #touch [data-k].on { background:rgba(110,231,168,.30); border-color:var(--accent); }
 
+  /* The whole lower-left of the screen steers, not just the arrows. Thumbs
+     slide rather than tap, and they drift well outside the visible pad. */
+  #tzone {
+    position:absolute; pointer-events:auto;
+    left:0; bottom:0; width:46%; height:74%;
+  }
+
   /* Keep controls clear of the notch and home indicator. */
   .tpad {
-    position:absolute; width:156px; height:156px;
+    position:absolute; width:156px; height:156px; pointer-events:none;
     left:calc(16px + env(safe-area-inset-left));
     bottom:calc(16px + env(safe-area-inset-bottom));
   }
-  .tpad [data-k] { width:52px; height:52px; border-radius:10px; }
+  .tpad [data-k] { width:52px; height:52px; border-radius:10px;
+                   pointer-events:none; }
   .tpad [data-k="up"]    { left:52px; top:0; }
   .tpad [data-k="left"]  { left:0;    top:52px; }
   .tpad [data-k="right"] { left:104px;top:52px; }
@@ -175,7 +183,8 @@
     <div id="fullHint" class="hide"></div>
 
     <div id="touch" class="hide">
-      <div class="tpad">
+      <div id="tzone"></div>
+      <div class="tpad" id="tpad">
         <div data-k="up">&#9650;</div>
         <div data-k="left">&#9664;</div>
         <div data-k="right">&#9654;</div>
@@ -354,11 +363,46 @@ if (TOUCH) {
 // Rebuilt from the full set of live touches on every event. Doing it this way
 // rather than tracking press/release per button is what makes holding left
 // while tapping attack work, and what handles a finger sliding off a button.
+const PAD_DEADZONE = 16;
+
+// Eight sectors around the pad centre. Sectors rather than independent x/y
+// thresholds, so pushing straight left gives *only* left — with thresholds, a
+// slightly high thumb would also aim upward and change where your attack goes.
+const PAD_SECTORS = [
+  ['right'], ['right','down'], ['down'], ['left','down'],
+  ['left'],  ['left','up'],    ['up'],   ['right','up'],
+];
+
+function padDirections(t) {
+  const r = $('tpad').getBoundingClientRect();
+  const dx = t.clientX - (r.left + r.width / 2);
+  const dy = t.clientY - (r.top + r.height / 2);
+  if (Math.hypot(dx, dy) < PAD_DEADZONE) return [];
+  const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  return PAD_SECTORS[((sector % 8) + 8) % 8];
+}
+
+function inRect(t, r) {
+  return t.clientX >= r.left && t.clientX <= r.right &&
+         t.clientY >= r.top  && t.clientY <= r.bottom;
+}
+
+// Rebuilt from the full set of live touches on every event. Doing it this way
+// rather than tracking press/release per button is what makes holding left
+// while tapping attack work, and what handles a finger sliding off a button.
 function applyTouches(e) {
   e.preventDefault();
 
+  const zone = $('tzone').getBoundingClientRect();
   const down = new Set();
+
   for (const t of e.touches) {
+    // Anywhere in the steering zone reads as a direction, from wherever the
+    // thumb happens to be — no gaps to fall between.
+    if (inRect(t, zone)) {
+      for (const k of padDirections(t)) down.add(k);
+      continue;
+    }
     const el = document.elementFromPoint(t.clientX, t.clientY);
     const k = el && el.dataset && el.dataset.k;
     if (k) down.add(k);

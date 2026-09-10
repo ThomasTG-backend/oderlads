@@ -1,0 +1,149 @@
+:root {
+  --bg:#0f1115; --panel:#171a21; --line:#262b36;
+  --text:#e6e8ec; --dim:#8b93a3; --accent:#6ee7a8; --bad:#f07a7a;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font:13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding:16px; display:flex; gap:16px; align-items:flex-start;
+  flex-wrap:wrap; justify-content:center;
+}
+canvas { background:#0a0c10; border:1px solid var(--line); border-radius:6px;
+         display:block; width:100%; height:auto; image-rendering:pixelated; }
+.stage { flex:1 1 640px; max-width:960px; }
+.side  { flex:0 0 250px; }
+.panel { background:var(--panel); border:1px solid var(--line);
+         border-radius:6px; padding:12px; margin-bottom:12px; }
+.lbl { color:var(--dim); font-size:11px; text-transform:uppercase;
+       letter-spacing:1px; margin-bottom:8px; }
+button { background:#222735; color:var(--text); border:1px solid var(--line);
+         border-radius:5px; padding:7px 12px; cursor:pointer; font:inherit; }
+button:hover { border-color:var(--accent); color:var(--accent); }
+input[type=text] { background:#0d0f14; color:var(--text);
+  border:1px solid var(--line); border-radius:5px; padding:7px 10px;
+  font:inherit; width:80px; text-transform:uppercase; }
+input[type=range] { width:100%; }
+.row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.slider { margin-bottom:9px; }
+.slider .top { display:flex; justify-content:space-between; font-size:11px; }
+.slider .top span:last-child { color:var(--accent); }
+table { width:100%; font-size:11.5px; }
+td:first-child { color:var(--dim); }
+td:last-child { text-align:right; }
+#scores td:first-child { color:var(--text); }
+#scores td:last-child { color:var(--accent); font-weight:bold; }
+#code { font-size:26px; letter-spacing:6px; color:var(--accent);
+        text-align:center; padding:6px 0; }
+.hint { color:var(--dim); font-size:11.5px; margin-top:8px; }
+.warn { color:var(--bad); font-size:11.5px; margin-top:8px; }
+.hide { display:none !important; }
+.sec { border-top:1px solid var(--line); margin:12px 0 10px; padding-top:10px; }
+
+/* The canvas and everything drawn on top of it. */
+.frame { position:relative; }
+
+#hud {
+  position:absolute; top:12px; right:12px; min-width:132px;
+  background:rgba(15,17,21,.72); border:1px solid var(--line);
+  border-radius:6px; padding:8px 10px; backdrop-filter:blur(3px);
+}
+#hud #code { font-size:17px; letter-spacing:4px; padding:0 0 5px;
+             border-bottom:1px solid var(--line); margin-bottom:6px; }
+
+#lobby {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px;
+  background:rgba(10,12,16,.82); border-radius:6px; padding:20px;
+}
+#lobby .title { font-size:26px; letter-spacing:9px; color:var(--accent);
+                margin-bottom:4px; }
+#lobby input { text-align:center; }
+#lobby #inName { width:190px; text-transform:none; }
+#lobby .or { color:var(--dim); font-size:11px; letter-spacing:1px; }
+
+/* --- touch controls ---------------------------------------------------
+   Shown on coarse-pointer devices, or forced with ?touch for development
+   on a desktop. */
+body.touch { padding:0; overflow:hidden; touch-action:none; }
+body.touch .stage {
+  width:100vw; height:100vh; max-width:none; flex:none;
+  display:flex; align-items:center; justify-content:center;
+}
+body.touch .frame { width:min(100vw, calc(100vh * 960 / 540)); flex:none; }
+body.touch canvas { border:none; border-radius:0; }
+/* The keyboard hint under the canvas is meaningless on a phone, and while
+   it stays in the flex row it also steals width from the game. */
+body.touch .stage > .hint { display:none; }
+
+#touch { position:absolute; inset:0; pointer-events:none; touch-action:none; }
+#touch [data-k] {
+  position:absolute; pointer-events:auto;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(230,232,236,.10); border:1.5px solid rgba(230,232,236,.28);
+  color:rgba(230,232,236,.75); border-radius:50%;
+  font-size:19px; user-select:none; -webkit-user-select:none;
+}
+#touch [data-k].on { background:rgba(110,231,168,.30); border-color:var(--accent); }
+
+/* The whole lower-left of the screen steers, not just the arrows. Thumbs
+   slide rather than tap, and they drift well outside the visible pad. */
+#tzone {
+  position:absolute; pointer-events:auto;
+  left:0; bottom:0; width:46%; height:74%;
+}
+
+/* Keep controls clear of the notch and home indicator. */
+.tpad {
+  position:absolute; width:156px; height:156px; pointer-events:none;
+  left:calc(16px + env(safe-area-inset-left));
+  bottom:calc(16px + env(safe-area-inset-bottom));
+}
+.tpad [data-k] { width:52px; height:52px; border-radius:10px;
+                 pointer-events:none; }
+.tpad [data-k="up"]    { left:52px; top:0; }
+.tpad [data-k="left"]  { left:0;    top:52px; }
+.tpad [data-k="right"] { left:104px;top:52px; }
+.tpad [data-k="down"]  { left:52px; top:104px; }
+
+#touch [data-k="attack"] { width:78px; height:78px;
+  right:calc(16px  + env(safe-area-inset-right));
+  bottom:calc(20px + env(safe-area-inset-bottom)); }
+#touch [data-k="jump"]   { width:78px; height:78px;
+  right:calc(104px + env(safe-area-inset-right));
+  bottom:calc(20px + env(safe-area-inset-bottom)); }
+#touch [data-k="dash"]   { width:62px; height:62px;
+  right:calc(24px  + env(safe-area-inset-right));
+  bottom:calc(108px + env(safe-area-inset-bottom)); }
+
+#btnFull {
+  position:absolute; z-index:12;
+  top:calc(12px + env(safe-area-inset-top));
+  left:calc(12px + env(safe-area-inset-left));
+  width:38px; height:38px; padding:0; font-size:15px; line-height:1;
+  background:rgba(15,17,21,.72); border:1px solid var(--line);
+  border-radius:8px; color:var(--text);
+}
+#fullHint {
+  position:absolute; z-index:12;
+  top:calc(58px + env(safe-area-inset-top));
+  left:calc(12px + env(safe-area-inset-left));
+  max-width:210px; padding:8px 10px; font-size:11.5px; line-height:1.45;
+  background:rgba(15,17,21,.92); border:1px solid var(--line);
+  border-radius:6px; color:var(--dim);
+}
+
+#rotate {
+  position:fixed; inset:0; z-index:20; background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:30px; font-size:15px; color:var(--dim);
+}
+
+/* Shown when a player is running a different build from the host. The state
+   they exchange is versioned by hand, so a mismatch can break quietly. */
+#verWarn {
+  position:absolute; z-index:14; top:12px; left:50%; transform:translateX(-50%);
+  max-width:80%; padding:8px 14px; text-align:center; font-size:12px;
+  background:rgba(240,122,122,.14); border:1px solid var(--bad);
+  border-radius:6px; color:var(--bad);
+}
